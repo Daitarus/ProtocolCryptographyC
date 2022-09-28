@@ -94,21 +94,21 @@ namespace ProtocolCryptographyC
                 return $"F:{e}";
             }
         }
-        public string SendFileInfo(string? path, FileInfo fileInfo)
+        public string SendFileInfo(string fileName)
         {
-            return fileWork.SendFileInfo(path, fileInfo, aes);
+            return fileWork.SendFileInfo(fileName, aes);
         }
-        public string SendFile(FileInfo fileInfo)
+        public string SendFile(string fileName)
         {
-            return fileWork.SendFile(fileInfo, aes);
+            return fileWork.SendFile(fileName, aes);
         }
         public string GetFileInfo()
         {
             return fileWork.GetFileInfo(aes);
         }
-        public string GetFile(FileInfo fileInfo)
+        public string GetFile()
         {
-            return fileWork.GetFile(fileInfo, aes);
+            return fileWork.GetFile(aes);
         }
         public string Disconnect()
         {

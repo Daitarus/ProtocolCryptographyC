@@ -100,7 +100,7 @@ namespace ProtocolCryptographyC
                                     socket.Send(buffer);
                                     //algorithm execution
                                     fileWork = new FileWork(socket);
-                                    algorithm(new ClientInfo(((IPEndPoint)(socket.RemoteEndPoint)).Address.ToString(), ((IPEndPoint)(socket.RemoteEndPoint)).Port.ToString(), aes, DateTime.Now));
+                                    algorithm(new ClientInfo(((IPEndPoint)(socket.RemoteEndPoint)).Address.ToString(), ((IPEndPoint)(socket.RemoteEndPoint)).Port.ToString(), aes, DateTime.Now, hash));
                                 }
                                 else
                                 {
@@ -123,21 +123,21 @@ namespace ProtocolCryptographyC
             }
         }
 
-        public string SendFileInfo(string? path, FileInfo fileInfo, Aes aes)
+        public string SendFileInfo(string fileName, Aes aes)
         {
-            return fileWork.SendFileInfo(path, fileInfo, aes);
+            return fileWork.SendFileInfo(fileName, aes);
         }
-        public string SendFile(FileInfo fileInfo, Aes aes)
+        public string SendFile(string fileName, Aes aes)
         {
-            return fileWork.SendFile(fileInfo, aes);
+            return fileWork.SendFile(fileName, aes);
         }
         public string GetFileInfo(Aes aes)
         {
             return fileWork.GetFileInfo(aes);
         }
-        public string GetFile(FileInfo fileInfo, Aes aes)
+        public string GetFile(Aes aes)
         {
-            return fileWork.GetFile(fileInfo, aes);
+            return fileWork.GetFile(aes);
         }
 
         private string Disconnect(Socket socket)

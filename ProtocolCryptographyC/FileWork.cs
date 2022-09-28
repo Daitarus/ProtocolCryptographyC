@@ -18,12 +18,12 @@ namespace ProtocolCryptographyC
         }
 
 
-        public string SendFileInfo(string? path, FileInfo fileInfo, Aes aes)
+        public string SendFileInfo(string fileName, Aes aes)
         {
             try
             {
                 //encrypt fileInfo + ask get file
-                byte[]? bufferFile = Segment.PackSegment(TypeSegment.ASK_GET_FILE, (byte)0, EncryptAES(Encoding.UTF8.GetBytes(path + fileInfo.Name), aes));
+                byte[]? bufferFile = Segment.PackSegment(TypeSegment.ASK_GET_FILE, (byte)0, EncryptAES(Encoding.UTF8.GetBytes(fileName), aes));
                 socket.Send(bufferFile);
                 return "I:File info was send";
             }
@@ -47,9 +47,8 @@ namespace ProtocolCryptographyC
                 {
                     return "E:Wasn't get file info";
                 }
-                segment.DecryptPayload(aes);
-                FileInfo fileInfo = new FileInfo(Encoding.UTF8.GetString(segment.Payload));
-                return fileInfo.FullName;
+                segment.DecryptPayload(aes);           
+                return Encoding.UTF8.GetString(segment.Payload);
             }
             catch (Exception e)
             {
@@ -57,12 +56,13 @@ namespace ProtocolCryptographyC
             }
         }
 
-        public string SendFile(FileInfo fileInfo, Aes aes)
+        public string SendFile(string fileName, Aes aes)
         {
             try
             {
                 byte[]? bufferFile = null;
                 byte[]? buffer = null;
+                FileInfo fileInfo = new FileInfo(fileName);
 
                 //check file and send aes(system message)
                 if (!fileInfo.Exists)
@@ -125,7 +125,7 @@ namespace ProtocolCryptographyC
                 return $"F:{e}";
             }
         }
-        public string GetFile(FileInfo fileInfo, Aes aes)
+        public string GetFile(Aes aes)
         {
             try
             {
@@ -145,7 +145,7 @@ namespace ProtocolCryptographyC
                 segment.DecryptPayload(aes);
                 if (Encoding.UTF8.GetString(segment.Payload) == "error")
                 {
-                    return $"W:File not found or very big - File:\"{fileInfo.Name}\"";
+                    return $"W:File not found or very big";
                 }
 
                 byte numAllBlock = segment.Payload[0];
@@ -154,7 +154,7 @@ namespace ProtocolCryptographyC
                 {
                     buffer[i - 1] = segment.Payload[i];
                 }
-                fileInfo = new FileInfo(Encoding.UTF8.GetString(buffer));
+                FileInfo fileInfo = new FileInfo(Encoding.UTF8.GetString(buffer));
 
                 //get file
                 using (FileStream fstream = new FileStream(fileInfo.Name, FileMode.OpenOrCreate))
