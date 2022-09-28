@@ -123,13 +123,21 @@ namespace ProtocolCryptographyC
             }
         }
 
-        public string TransferFile(Aes aes)
+        public string SendFileInfo(string? path, FileInfo fileInfo, Aes aes)
         {
-            return fileWork.TransferFile(aes);
+            return fileWork.SendFileInfo(path, fileInfo, aes);
         }
-        public string GetFile(string? path, FileInfo fileInfo, Aes aes)
+        public string SendFile(FileInfo fileInfo, Aes aes)
         {
-            return fileWork.GetFile(path, fileInfo, aes);
+            return fileWork.SendFile(fileInfo, aes);
+        }
+        public string GetFileInfo(Aes aes)
+        {
+            return fileWork.GetFileInfo(aes);
+        }
+        public string GetFile(FileInfo fileInfo, Aes aes)
+        {
+            return fileWork.GetFile(fileInfo, aes);
         }
 
         private string Disconnect(Socket socket)

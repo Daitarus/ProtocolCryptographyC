@@ -16,23 +16,51 @@ namespace ProtocolCryptographyC
         {
             this.socket = socket;
         }
-        public string TransferFile(Aes aes)
+
+
+        public string SendFileInfo(string? path, FileInfo fileInfo, Aes aes)
+        {
+            try
+            {
+                //encrypt fileInfo + ask get file
+                byte[]? bufferFile = Segment.PackSegment(TypeSegment.ASK_GET_FILE, (byte)0, EncryptAES(Encoding.UTF8.GetBytes(path + fileInfo.Name), aes));
+                socket.Send(bufferFile);
+                return "I:File info was send";
+            }
+            catch (Exception e)
+            {
+                return $"F:{e}";
+            }
+        }
+
+        public string GetFileInfo(Aes aes)
         {
             try
             {
                 //wait ask get file + decrypt fileInfo
                 Segment? segment = Segment.ParseSegment(socket);
-                if(segment == null)
+                if (segment == null)
                 {
                     return "E:Wasn't get file info";
                 }
-                if((segment.Type != TypeSegment.ASK_GET_FILE) || (segment.Payload == null))
+                if ((segment.Type != TypeSegment.ASK_GET_FILE) || (segment.Payload == null))
                 {
                     return "E:Wasn't get file info";
                 }
                 segment.DecryptPayload(aes);
                 FileInfo fileInfo = new FileInfo(Encoding.UTF8.GetString(segment.Payload));
+                return fileInfo.FullName;
+            }
+            catch (Exception e)
+            {
+                return $"F:{e}";
+            }
+        }
 
+        public string SendFile(FileInfo fileInfo, Aes aes)
+        {
+            try
+            {
                 byte[]? bufferFile = null;
                 byte[]? buffer = null;
 
@@ -97,13 +125,10 @@ namespace ProtocolCryptographyC
                 return $"F:{e}";
             }
         }
-        public string GetFile(string? path, FileInfo fileInfo, Aes aes)
+        public string GetFile(FileInfo fileInfo, Aes aes)
         {
             try
             {
-                //encrypt fileInfo + ask get file
-                byte[]? bufferFile = Segment.PackSegment(TypeSegment.ASK_GET_FILE, (byte)0, EncryptAES(Encoding.UTF8.GetBytes(path + fileInfo.Name),aes));
-                socket.Send(bufferFile);
 
                 //get first part file aes(system message or number of block + fileInfo)
                 Segment? segment;
