@@ -66,7 +66,7 @@ namespace ProtocolCryptographyC
                 socket.Send(buffer);
 
                 //send file
-                using (FileStream fstream = File.Open(fileInfo.Name, FileMode.Open))
+                using (FileStream fstream = File.Open(fileInfo.FullName, FileMode.Open))
                 {
                     //load file part
                     int numReadByte;
@@ -97,12 +97,12 @@ namespace ProtocolCryptographyC
                 return $"F:{e}";
             }
         }
-        public string GetFile(FileInfo fileInfo, Aes aes)
+        public string GetFile(string? path, FileInfo fileInfo, Aes aes)
         {
             try
             {
                 //encrypt fileInfo + ask get file
-                byte[]? bufferFile = Segment.PackSegment(TypeSegment.ASK_GET_FILE, (byte)0, EncryptAES(Encoding.UTF8.GetBytes(fileInfo.Name),aes));
+                byte[]? bufferFile = Segment.PackSegment(TypeSegment.ASK_GET_FILE, (byte)0, EncryptAES(Encoding.UTF8.GetBytes(path + fileInfo.Name),aes));
                 socket.Send(bufferFile);
 
                 //get first part file aes(system message or number of block + fileInfo)
