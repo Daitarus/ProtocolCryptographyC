@@ -19,6 +19,7 @@ namespace ProtocolCryptographyC
         private Socket listenSocket  = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         RSACryptoServiceProvider rsa;
         private FileWork fileWork;
+        private MessageWork messageWork;
 
 
         public PccServer(IPEndPoint serverEndPoint, RSACryptoServiceProvider rsa)
@@ -99,6 +100,7 @@ namespace ProtocolCryptographyC
                                     buffer = Segment.PackSegment(TypeSegment.ANSWER_AUTHORIZATION_YES, (byte)0, null);
                                     socket.Send(buffer);
                                     //algorithm execution
+                                    messageWork = new MessageWork(socket);
                                     fileWork = new FileWork(socket);
                                     algorithm(new ClientInfo(((IPEndPoint)(socket.RemoteEndPoint)).Address.ToString(), ((IPEndPoint)(socket.RemoteEndPoint)).Port.ToString(), aes, DateTime.Now, hash));
                                 }
@@ -138,6 +140,15 @@ namespace ProtocolCryptographyC
         public string GetFile(Aes aes)
         {
             return fileWork.GetFile(aes);
+        }
+
+        public string SendMessage(byte[] message, Aes aes)
+        {
+            return messageWork.SendMessage(message, aes);
+        }
+        public byte[] GetMessage(Aes aes)
+        {
+            return messageWork.GetMessage(aes);
         }
 
         private string Disconnect(Socket socket)

@@ -16,5 +16,6 @@ namespace ProtocolCryptographyC
         ANSWER_AUTHORIZATION_NO = 5,
         ASK_GET_FILE = 6,
         FILE = 7,
+        MESSAGE = 8
     }
 }

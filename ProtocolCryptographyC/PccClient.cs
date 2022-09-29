@@ -14,6 +14,7 @@ namespace ProtocolCryptographyC
         RSACryptoServiceProvider rsa = new RSACryptoServiceProvider();
         private Aes aes;
         private FileWork fileWork;
+        private MessageWork messageWork;
 
         public PccClient(IPEndPoint serverEndPoint, string authorizationString)
         {
@@ -86,6 +87,7 @@ namespace ProtocolCryptographyC
                 }
 
                 //connect
+                messageWork = new MessageWork(socket);
                 fileWork = new FileWork(socket);
                 return "I:Successful connect";
             }
@@ -110,6 +112,16 @@ namespace ProtocolCryptographyC
         {
             return fileWork.GetFile(aes);
         }
+
+        public string SendMessage(byte[] message)
+        {
+            return messageWork.SendMessage(message, aes);
+        }
+        public byte[] GetMessage()
+        {
+            return messageWork.GetMessage(aes);
+        }
+
         public string Disconnect()
         {
             try
