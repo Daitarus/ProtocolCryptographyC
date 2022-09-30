@@ -47,7 +47,8 @@ namespace ProtocolCryptographyC
 		}
 		private async void ClientWork(Socket socket, Authorization authorization, Algorithm algorithm, GetSystemMessage getSystemMessage)
         {
-            getSystemMessage($"I:Client({((IPEndPoint)(socket.RemoteEndPoint)).Address.ToString()}:{((IPEndPoint)(socket.RemoteEndPoint)).Port.ToString()}) - connected");
+            string system_message_base = $"I:{((IPEndPoint)(socket.RemoteEndPoint)).Address.ToString()}:{((IPEndPoint)(socket.RemoteEndPoint)).Port.ToString()} - ";
+            getSystemMessage(system_message_base + "connected");
             Segment segment = new Segment();
             byte[] hash = new byte[20];
             Aes aes = Aes.Create();
@@ -96,7 +97,7 @@ namespace ProtocolCryptographyC
                                 //authorization
                                 if (authorization(hash))
                                 {
-                                    getSystemMessage($"I:Client({((IPEndPoint)(socket.RemoteEndPoint)).Address.ToString()}:{((IPEndPoint)(socket.RemoteEndPoint)).Port.ToString()}) - authorization");
+                                    getSystemMessage(system_message_base + "authorization");
                                     buffer = Segment.PackSegment(TypeSegment.ANSWER_AUTHORIZATION_YES, (byte)0, null);
                                     socket.Send(buffer);
                                     //algorithm execution
@@ -106,7 +107,7 @@ namespace ProtocolCryptographyC
                                 }
                                 else
                                 {
-                                    getSystemMessage($"I:Client({((IPEndPoint)(socket.RemoteEndPoint)).Address.ToString()}:{((IPEndPoint)(socket.RemoteEndPoint)).Port.ToString()}) - no authorization");
+                                    getSystemMessage(system_message_base + "no authorization");
                                     buffer = Segment.PackSegment(TypeSegment.ANSWER_AUTHORIZATION_NO, (byte)0, null);
                                     socket.Send(buffer);
                                 }
@@ -153,17 +154,18 @@ namespace ProtocolCryptographyC
 
         private string Disconnect(Socket socket)
         {
-            string SystemMessage = "I:disconnect";
+            string system_message_base = $"I:{((IPEndPoint)(socket.RemoteEndPoint)).Address.ToString()}:{((IPEndPoint)(socket.RemoteEndPoint)).Port.ToString()} - ";
+            string system_message = "I:disconnect";
             try
             {
-                SystemMessage = $"I:Client({((IPEndPoint)(socket.RemoteEndPoint)).Address.ToString()}:{((IPEndPoint)(socket.RemoteEndPoint)).Port.ToString()}) - disconnect";
+                system_message = system_message_base + "disconnect";
                 socket.Shutdown(SocketShutdown.Both);
             }
             finally
             {
                 socket.Close();
             }
-            return SystemMessage;
+            return system_message;
         }  
     }
 }
