@@ -58,21 +58,27 @@ namespace ProtocolCryptographyC
             {
                 byte[]? bufferFile = null;
                 byte[]? buffer = null;
-                FileInfo fileInfo = new FileInfo(fileName);
 
                 //check file and send aes(system message)
+                if(fileName==null)
+                {
+                    buffer = Segment.PackSegment(TypeSegment.FILE, (byte)0, EncryptAES(Encoding.UTF8.GetBytes("error"), aes));
+                    socket.Send(buffer);
+                    return $"W:File not found - File:\"{fileName}\"";
+                }
+                FileInfo fileInfo = new FileInfo(fileName);
                 if (!fileInfo.Exists)
                 {
                     buffer = Segment.PackSegment(TypeSegment.FILE, (byte)0, EncryptAES(Encoding.UTF8.GetBytes("error"),aes));
                     socket.Send(buffer);
-                    return $"W:File not found - File:\"{fileInfo.Name}\"";
+                    return $"W:File not found - File:\"{fileInfo.FullName}\"";
                 }
                 long numAllBlock = (long)Math.Ceiling((double)fileInfo.Length / (double)Segment.lengthBlockFile);
                 if ((fileInfo.Length == 0) || (numAllBlock >= 256))
                 {
                     buffer = Segment.PackSegment(TypeSegment.FILE, (byte)0, EncryptAES(Encoding.UTF8.GetBytes("error"), aes));
                     socket.Send(buffer);
-                    return $"W:File is very big - File:\"{fileInfo.Name}\"";
+                    return $"W:File is very big - File:\"{fileInfo.FullName}\"";
                 }
                 //send first file part aes(system message or number of block + fileInfo)
                 buffer = Encoding.UTF8.GetBytes(fileInfo.Name);
@@ -85,7 +91,7 @@ namespace ProtocolCryptographyC
                 buffer = Segment.PackSegment(TypeSegment.FILE, (byte)0, EncryptAES(bufferFile, aes));
                 if (buffer == null)
                 {
-                    return $"E:Wasn't send file info - File:\"{fileInfo.Name}\"";
+                    return $"E:Wasn't send file info - File:\"{fileInfo.FullName}\"";
                 }
                 socket.Send(buffer);
 
@@ -109,23 +115,22 @@ namespace ProtocolCryptographyC
                         buffer = Segment.PackSegment(TypeSegment.FILE, (byte)i, EncryptAES(bufferFile, aes));
                         if (buffer == null)
                         {
-                            return $"E:Wasn't send file block {i}/{numAllBlock} - File:\"{fileInfo.Name}\"";
+                            return $"E:Wasn't send file block {i}/{numAllBlock} - File:\"{fileInfo.FullName}\"";
                         }
                         socket.Send(buffer);
                     }
                 }
-                return $"I:All file's block [{numAllBlock}] was send - File:\"{fileInfo.Name}\"";
+                return $"I:All file's block [{numAllBlock}] was send - File:\"{fileInfo.FullName}\"";
             }
             catch(Exception e)
             {
                 return $"F:{e}";
             }
         }
-        public string GetFile(Aes aes)
+        public string GetFile(string path, Aes aes)
         {
             try
             {
-
                 //get first part file aes(system message or number of block + fileInfo)
                 Segment? segment;
                 segment = Segment.ParseSegment(socket);
@@ -150,10 +155,24 @@ namespace ProtocolCryptographyC
                 {
                     buffer[i - 1] = segment.Payload[i];
                 }
-                FileInfo fileInfo = new FileInfo(Encoding.UTF8.GetString(buffer));
+                if(path==null)
+                {
+                    path = "";
+                }
+
+                //create directory
+                if(path!="")
+                {
+                    if(!Directory.Exists(path))
+                    {
+                        Directory.CreateDirectory(path);
+                    }
+                }
+
+                FileInfo fileInfo = new FileInfo(path + Encoding.UTF8.GetString(buffer));
 
                 //get file
-                using (FileStream fstream = new FileStream(fileInfo.Name, FileMode.OpenOrCreate))
+                using (FileStream fstream = new FileStream(fileInfo.FullName, FileMode.OpenOrCreate))
                 {
                     for (int i = 0; i < numAllBlock; i++)
                     {
