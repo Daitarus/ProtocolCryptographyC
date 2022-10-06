@@ -161,13 +161,5 @@ namespace ProtocolCryptographyC
 				return null;
             }
         }
-
-		public void DecryptPayload(Aes aes)
-		{
-			if (payload != null)
-			{
-				payload = FileWork.DecryptAES(payload, aes);
-			}
-		}
 	}
 }

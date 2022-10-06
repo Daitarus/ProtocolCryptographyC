@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace ProtocolCryptographyC
 {
-    public enum System_Message : byte
+    public enum SystemMessage : byte
     {
         GET_NOT_PCC = 0,
         NO_TRANSFER_AUTHORIZATION_INFO = 1,

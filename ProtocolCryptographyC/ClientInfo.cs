@@ -1,26 +1,23 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Net;
 using System.Security.Cryptography;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace ProtocolCryptographyC
 {
     public class ClientInfo
     {
-        public string Ip { get; }
-        public string Port { get; }
-        public Aes aes { get; }
+        public IPEndPoint ClientEndPoint { get; }
         public DateTime TimeConnection { get; }
         public DateTime TimeDisconnection { set;  get; }
-        public byte[] Hash { get; }
+        public byte[] Hash { get; set; }
 
-        public ClientInfo(string ip, string port, Aes aes, DateTime timeConnection, byte[] hash)
+        public ClientInfo(IPEndPoint clientEndPoint, DateTime timeConnection)
         {
-            Ip = ip;
-            Port = port;
-            this.aes = aes;
+            ClientEndPoint = clientEndPoint;
+            TimeConnection = timeConnection;
+        }
+        public ClientInfo(IPEndPoint clientEndPoint, DateTime timeConnection, byte[] hash)
+        {
+            ClientEndPoint = clientEndPoint;
             TimeConnection = timeConnection;
             Hash = hash;
         }

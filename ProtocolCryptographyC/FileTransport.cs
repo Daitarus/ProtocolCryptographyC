@@ -1,27 +1,30 @@
 ﻿using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
+using CryptL;
 
 namespace ProtocolCryptographyC
 {
-    internal class FileWork
+    public class FileTransport
     {
         public Socket socket;
+        private CryptAES cryptAES;
         
-        public FileWork(Socket socket)
+        public FileTransport(Socket socket, CryptAES cryptAES)
         {
             this.socket = socket;
+            this.cryptAES = cryptAES;
         }
 
 
-        public string SendFileInfo(string fileName, Aes aes)
+        public string SendFileInfo(string fileName)
         {
             try
             {
                 //encrypt fileInfo + ask get file
-                byte[]? bufferFile = Segment.PackSegment(TypeSegment.ASK_GET_FILE, (byte)0, EncryptAES(Encoding.UTF8.GetBytes(fileName), aes));
+                byte[]? bufferFile = Segment.PackSegment(TypeSegment.ASK_GET_FILE, 0, cryptAES.Encrypt(Encoding.UTF8.GetBytes(fileName)));
                 socket.Send(bufferFile);
-                return "I:File info was send";
+                return "I:File info was sent";
             }
             catch (Exception e)
             {
@@ -29,7 +32,7 @@ namespace ProtocolCryptographyC
             }
         }
 
-        public string GetFileInfo(Aes aes)
+        public string GetFileInfo()
         {
             try
             {
@@ -37,14 +40,13 @@ namespace ProtocolCryptographyC
                 Segment? segment = Segment.ParseSegment(socket);
                 if (segment == null)
                 {
-                    return "E:Wasn't get file info";
+                    return "E:File info wasn't got";
                 }
                 if ((segment.Type != TypeSegment.ASK_GET_FILE) || (segment.Payload == null))
                 {
-                    return "E:Wasn't get file info";
-                }
-                segment.DecryptPayload(aes);           
-                return Encoding.UTF8.GetString(segment.Payload);
+                    return "E:File info wasn't got";
+                }       
+                return Encoding.UTF8.GetString(cryptAES.Decrypt(segment.Payload));
             }
             catch (Exception e)
             {
@@ -52,34 +54,31 @@ namespace ProtocolCryptographyC
             }
         }
 
-        public string SendFile(string fileName, Aes aes)
+        public string SendFile(string fileName)
         {
+            if(fileName==null)
+                throw new ArgumentNullException(nameof(fileName));
+
             try
             {
                 byte[]? bufferFile = null;
                 byte[]? buffer = null;
 
                 //check file and send aes(system message)
-                if(fileName==null)
-                {
-                    buffer = Segment.PackSegment(TypeSegment.FILE, (byte)0, EncryptAES(Encoding.UTF8.GetBytes("error"), aes));
-                    socket.Send(buffer);
-                    return $"W:File not found - File:\"{fileName}\"";
-                }
                 FileInfo fileInfo = new FileInfo(fileName);
+                buffer = Segment.PackSegment(TypeSegment.FILE, 0, cryptAES.Encrypt(Encoding.UTF8.GetBytes("error")));
                 if (!fileInfo.Exists)
                 {
-                    buffer = Segment.PackSegment(TypeSegment.FILE, (byte)0, EncryptAES(Encoding.UTF8.GetBytes("error"),aes));
                     socket.Send(buffer);
                     return $"W:File not found - File:\"{fileInfo.FullName}\"";
                 }
                 long numAllBlock = (long)Math.Ceiling((double)fileInfo.Length / (double)Segment.lengthBlockFile);
                 if ((fileInfo.Length == 0) || (numAllBlock >= 256))
                 {
-                    buffer = Segment.PackSegment(TypeSegment.FILE, (byte)0, EncryptAES(Encoding.UTF8.GetBytes("error"), aes));
                     socket.Send(buffer);
                     return $"W:File is very big - File:\"{fileInfo.FullName}\"";
                 }
+
                 //send first file part aes(system message or number of block + fileInfo)
                 buffer = Encoding.UTF8.GetBytes(fileInfo.Name);
                 bufferFile = new byte[buffer.Length + 1];
@@ -88,10 +87,10 @@ namespace ProtocolCryptographyC
                 {
                     bufferFile[i + 1] = buffer[i];
                 }
-                buffer = Segment.PackSegment(TypeSegment.FILE, (byte)0, EncryptAES(bufferFile, aes));
+                buffer = Segment.PackSegment(TypeSegment.FILE, 0, cryptAES.Encrypt(bufferFile));
                 if (buffer == null)
                 {
-                    return $"E:Wasn't send file info - File:\"{fileInfo.FullName}\"";
+                    return $"E:File info wasn't sent - File:\"{fileInfo.FullName}\"";
                 }
                 socket.Send(buffer);
 
@@ -112,22 +111,22 @@ namespace ProtocolCryptographyC
                         }
 
                         //send part file
-                        buffer = Segment.PackSegment(TypeSegment.FILE, (byte)i, EncryptAES(bufferFile, aes));
+                        buffer = Segment.PackSegment(TypeSegment.FILE, (byte)i, cryptAES.Encrypt(bufferFile));
                         if (buffer == null)
                         {
-                            return $"E:Wasn't send file block {i}/{numAllBlock} - File:\"{fileInfo.FullName}\"";
+                            return $"E:File block {i}/{numAllBlock} wasn't sent - File:\"{fileInfo.FullName}\"";
                         }
                         socket.Send(buffer);
                     }
                 }
-                return $"I:All file's block [{numAllBlock}] was send - File:\"{fileInfo.FullName}\"";
+                return $"I:All file's block [{numAllBlock}] was sent - File:\"{fileInfo.FullName}\"";
             }
             catch(Exception e)
             {
                 return $"F:{e}";
             }
         }
-        public string GetFile(string path, Aes aes)
+        public string GetFile(string path)
         {
             try
             {
@@ -137,30 +136,30 @@ namespace ProtocolCryptographyC
                 
                 if (segment == null)
                 {
-                    return "E:Wasn't get file info";
+                    return "E:File info wasn't got";
                 }
                 if ((segment.Type != TypeSegment.FILE) || (segment.Payload == null))
                 {
-                    return "E:Wasn't get file info";
+                    return "E:File info wasn't got";
                 }
-                segment.DecryptPayload(aes);
-                if (Encoding.UTF8.GetString(segment.Payload) == "error")
+                byte[] buffer = cryptAES.Decrypt(segment.Payload);
+                if (Encoding.UTF8.GetString(buffer) == "error")
                 {
                     return $"W:File not found or very big";
                 }
 
-                byte numAllBlock = segment.Payload[0];
-                byte[] buffer = new byte[segment.Payload.Length - 1];
-                for (int i = 1; i < segment.Payload.Length; i++)
+                byte numAllBlock = buffer[0];
+                byte[] bufferFile = new byte[buffer.Length - 1];
+                for (int i = 1; i < buffer.Length; i++)
                 {
-                    buffer[i - 1] = segment.Payload[i];
+                    bufferFile[i - 1] = buffer[i];
                 }
+
+                //create directory
                 if(path==null)
                 {
                     path = "";
                 }
-
-                //create directory
                 if(path!="")
                 {
                     if(!Directory.Exists(path))
@@ -169,9 +168,8 @@ namespace ProtocolCryptographyC
                     }
                 }
 
-                FileInfo fileInfo = new FileInfo(path + Encoding.UTF8.GetString(buffer));
-
                 //get file
+                FileInfo fileInfo = new FileInfo(path + Encoding.UTF8.GetString(bufferFile));
                 using (FileStream fstream = new FileStream(fileInfo.FullName, FileMode.OpenOrCreate))
                 {
                     for (int i = 0; i < numAllBlock; i++)
@@ -185,9 +183,8 @@ namespace ProtocolCryptographyC
                         {
                             return $"E:Wasn't get file block {i}/{numAllBlock} - File:\"{fileInfo.Name}\"";
                         }
-                        segment.DecryptPayload(aes);
                         fstream.Seek(i * Segment.lengthBlockFile, SeekOrigin.Begin);
-                        fstream.Write(segment.Payload);
+                        fstream.Write(cryptAES.Decrypt(segment.Payload));
                     }
                 }
                 return $"I:All file's block [{numAllBlock}] was get - File:\"{fileInfo.Name}\"";
@@ -195,34 +192,6 @@ namespace ProtocolCryptographyC
             catch(Exception e)
             {
                 return $"F:{e}";
-            }
-        }
-
-        private static byte[] EncryptAES(byte[] data, Aes aes)
-        {
-            var encryptor = aes.CreateEncryptor(aes.Key, aes.IV);
-            using (var ms = new MemoryStream())
-            {
-                using (var cryptoStream = new CryptoStream(ms, encryptor, CryptoStreamMode.Write))
-                {
-                    cryptoStream.Write(data, 0, data.Length);
-                    cryptoStream.FlushFinalBlock();
-                    return ms.ToArray();
-                }
-            }
-        }
-
-        public static byte[] DecryptAES(byte[] data, Aes aes)
-        {
-            var decryptor = aes.CreateDecryptor(aes.Key, aes.IV);
-            using (var ms = new MemoryStream())
-            {
-                using (var cryptoStream = new CryptoStream(ms, decryptor, CryptoStreamMode.Write))
-                {
-                    cryptoStream.Write(data, 0, data.Length);
-                    cryptoStream.FlushFinalBlock();
-                    return ms.ToArray();
-                }
             }
         }
     }

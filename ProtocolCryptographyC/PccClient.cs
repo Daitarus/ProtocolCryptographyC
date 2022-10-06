@@ -2,7 +2,7 @@
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
-using System.IO;
+using CryptL;
 
 namespace ProtocolCryptographyC
 {
@@ -11,20 +11,16 @@ namespace ProtocolCryptographyC
         private IPEndPoint serverEndPoint;
         private Socket socket;
         private byte[] hash;
-        RSACryptoServiceProvider rsa = new RSACryptoServiceProvider();
-        private Aes aes;
-        private FileWork fileWork;
-        private MessageWork messageWork;
+        private CryptAES cryptAES;
+        public FileTransport fileTransport;
+        public MessageTransport messageTransport;
 
         public PccClient(IPEndPoint serverEndPoint, string authorizationString)
         {
             socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             this.serverEndPoint = serverEndPoint;
-            using (SHA1Managed sha1 = new SHA1Managed())
-            {
-                hash = sha1.ComputeHash(Encoding.UTF8.GetBytes(authorizationString));
-            }
-            aes = Aes.Create();
+            hash = HashSHA256.GetHash(Encoding.UTF8.GetBytes(authorizationString));
+            cryptAES = new CryptAES();
         }
         public string Connect()
         {
@@ -34,61 +30,42 @@ namespace ProtocolCryptographyC
                 socket.Connect(serverEndPoint);
 
                 //ask get publicKeyRSA
-                byte[]? buffer = Segment.PackSegment(TypeSegment.ASK_GET_PKEY, (byte)0, null);
+                byte[]? buffer = Segment.PackSegment(TypeSegment.ASK_GET_PKEY, 0, null);
                 socket.Send(buffer);
 
                 //waiting answer publicKeyRSA
                 Segment? segment = Segment.ParseSegment(socket);
-                if(segment == null)
+                if((segment == null) || (segment.Type != TypeSegment.PKEY) || (segment.Payload == null))
                 {
-                    return "E:Public key RSA wasn't get";
+                    return "E:Public key RSA wasn't got";
                 }
-                if((segment.Type != TypeSegment.PKEY) || (segment.Payload == null))
-                {
-                    return "E:Public key RSA wasn't get";
-                }
-                RSAParameters publicKey = rsa.ExportParameters(false);
-                publicKey.Modulus = segment.Payload;
-                rsa.ImportParameters(publicKey);
+                CryptRSA cryptRSA = new CryptRSA(segment.Payload, false);
 
                 //send hash + aesKey
-                int length = hash.Length + aes.Key.Length + aes.IV.Length;
+                int length = hash.Length + cryptAES.Key.Length + cryptAES.IV.Length;
                 buffer = new byte[length];
-                for (int i = 0; i < hash.Length; i++) 
-                {
-                    buffer[i] = hash[i];
-                }
-                for (int i = 0; i < aes.Key.Length; i++) 
-                {
-                    buffer[hash.Length + i] = aes.Key[i];
-                }
-                for (int i = 0; i < aes.IV.Length; i++)
-                {
-                    buffer[hash.Length + aes.Key.Length + i] = aes.IV[i];
-                }
+                Array.Copy(hash, 0, buffer, 0, hash.Length);
+                Array.Copy(cryptAES.Key, 0, buffer, hash.Length, cryptAES.Key.Length);
+                Array.Copy(cryptAES.IV, 0, buffer, hash.Length + cryptAES.Key.Length, cryptAES.IV.Length);
 
-                buffer = rsa.Encrypt(buffer, false);
-                buffer = Segment.PackSegment(TypeSegment.AUTHORIZATION, (byte)0, buffer);
+                buffer = cryptRSA.Encrypt(buffer);
+                buffer = Segment.PackSegment(TypeSegment.AUTHORIZATION, 0, buffer);
                 if (buffer == null)
                 {
-                    return "E:Wasn't send authorization info";
+                    return "E:Authorization info wasn't sent";
                 }
                 socket.Send(buffer);
 
                 //wait answer authorization
                 segment = Segment.ParseSegment(socket);
-                if(segment == null)
-                {
-                    return "E:No authorization";
-                }
-                if(segment.Type != TypeSegment.ANSWER_AUTHORIZATION_YES)
+                if(segment == null || segment.Type != TypeSegment.ANSWER_AUTHORIZATION_YES)
                 {
                     return "E:No authorization";
                 }
 
                 //connect
-                messageWork = new MessageWork(socket);
-                fileWork = new FileWork(socket);
+                messageTransport = new MessageTransport(socket, cryptAES);
+                fileTransport = new FileTransport(socket, cryptAES);
                 return "I:Successful connect";
             }
             catch(Exception e)
@@ -96,33 +73,8 @@ namespace ProtocolCryptographyC
                 return $"F:{e}";
             }
         }
-        public string SendFileInfo(string fileName)
-        {
-            return fileWork.SendFileInfo(fileName, aes);
-        }
-        public string SendFile(string fileName)
-        {
-            return fileWork.SendFile(fileName, aes);
-        }
-        public string GetFileInfo()
-        {
-            return fileWork.GetFileInfo(aes);
-        }
-        public string GetFile(string path)
-        {
-            return fileWork.GetFile(path, aes);
-        }
 
-        public string SendMessage(byte[] message)
-        {
-            return messageWork.SendMessage(message, aes);
-        }
-        public byte[] GetMessage()
-        {
-            return messageWork.GetMessage(aes);
-        }
-
-        public string Disconnect()
+        public void Disconnect()
         {
             try
             {
@@ -132,7 +84,6 @@ namespace ProtocolCryptographyC
             {
                 socket.Close();
             }
-            return "I:Disconnect";
         }
     }
 }
