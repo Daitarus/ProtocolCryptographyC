@@ -22,7 +22,7 @@ namespace ProtocolCryptographyC
             hash = HashSHA256.GetHash(Encoding.UTF8.GetBytes(authorizationString));
             cryptAES = new CryptAES();
         }
-        public string Connect()
+        public PccSystemMessage Connect()
         {
             try
             {
@@ -37,7 +37,7 @@ namespace ProtocolCryptographyC
                 Segment? segment = Segment.ParseSegment(socket);
                 if((segment == null) || (segment.Type != TypeSegment.PKEY) || (segment.Payload == null))
                 {
-                    return "E:Public key RSA wasn't got";
+                    return new PccSystemMessage(PccSystemMessageKey.ERROR, "Public key RSA wasn't got");
                 }
                 CryptRSA cryptRSA = new CryptRSA(segment.Payload, false);
 
@@ -52,7 +52,7 @@ namespace ProtocolCryptographyC
                 buffer = Segment.PackSegment(TypeSegment.AUTHORIZATION, 0, buffer);
                 if (buffer == null)
                 {
-                    return "E:Authorization info wasn't sent";
+                    return new PccSystemMessage(PccSystemMessageKey.ERROR, "Authorization info wasn't sent");
                 }
                 socket.Send(buffer);
 
@@ -60,21 +60,21 @@ namespace ProtocolCryptographyC
                 segment = Segment.ParseSegment(socket);
                 if(segment == null || segment.Type != TypeSegment.ANSWER_AUTHORIZATION_YES)
                 {
-                    return "E:No authorization";
+                    return new PccSystemMessage(PccSystemMessageKey.ERROR, "No authorization");
                 }
 
                 //connect
                 messageTransport = new MessageTransport(socket, cryptAES);
                 fileTransport = new FileTransport(socket, cryptAES);
-                return "I:Successful connect";
+                return new PccSystemMessage(PccSystemMessageKey.INFO, "Successful connect");
             }
             catch(Exception e)
             {
-                return $"F:{e}";
+                return new PccSystemMessage(PccSystemMessageKey.FATAL_ERROR, e.Message, e.StackTrace);
             }
         }
 
-        public void Disconnect()
+        public PccSystemMessage Disconnect()
         {
             try
             {
@@ -82,8 +82,9 @@ namespace ProtocolCryptographyC
             }
             finally
             {
-                socket.Close();
+                socket.Close();               
             }
+            return new PccSystemMessage(PccSystemMessageKey.INFO, "Disconnect");
         }
     }
 }

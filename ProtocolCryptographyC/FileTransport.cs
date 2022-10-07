@@ -17,44 +17,43 @@ namespace ProtocolCryptographyC
         }
 
 
-        public string SendFileInfo(string fileName)
+        public PccSystemMessage SendFileInfo(string fileName)
         {
             try
             {
                 //encrypt fileInfo + ask get file
                 byte[]? bufferFile = Segment.PackSegment(TypeSegment.ASK_GET_FILE, 0, cryptAES.Encrypt(Encoding.UTF8.GetBytes(fileName)));
                 socket.Send(bufferFile);
-                return "I:File info was sent";
+
+                return new PccSystemMessage(PccSystemMessageKey.INFO, "File info was sent");
             }
             catch (Exception e)
             {
-                return $"F:{e}";
+                return new PccSystemMessage(PccSystemMessageKey.FATAL_ERROR, e.Message, e.StackTrace);
             }
         }
 
-        public string GetFileInfo()
+        public PccSystemMessage GetFileInfo(out string? fileInfo)
         {
+            fileInfo = null;
             try
             {
                 //wait ask get file + decrypt fileInfo
                 Segment? segment = Segment.ParseSegment(socket);
-                if (segment == null)
+                if ((segment == null) || (segment.Type != TypeSegment.ASK_GET_FILE) || (segment.Payload == null))
                 {
-                    return "E:File info wasn't got";
-                }
-                if ((segment.Type != TypeSegment.ASK_GET_FILE) || (segment.Payload == null))
-                {
-                    return "E:File info wasn't got";
+                    return new PccSystemMessage(PccSystemMessageKey.ERROR, "File info wasn't got");
                 }       
-                return Encoding.UTF8.GetString(cryptAES.Decrypt(segment.Payload));
+                fileInfo = Encoding.UTF8.GetString(cryptAES.Decrypt(segment.Payload));
+                return new PccSystemMessage(PccSystemMessageKey.INFO, "File info was got");
             }
             catch (Exception e)
             {
-                return $"F:{e}";
+                return new PccSystemMessage(PccSystemMessageKey.FATAL_ERROR, e.Message, e.StackTrace);
             }
         }
 
-        public string SendFile(string fileName)
+        public PccSystemMessage SendFile(string fileName)
         {
             if(fileName==null)
                 throw new ArgumentNullException(nameof(fileName));
@@ -70,13 +69,13 @@ namespace ProtocolCryptographyC
                 if (!fileInfo.Exists)
                 {
                     socket.Send(buffer);
-                    return $"W:File not found - File:\"{fileInfo.FullName}\"";
+                    return new PccSystemMessage(PccSystemMessageKey.WARRNING, "File not found", $"File:\"{fileInfo.FullName}\"");
                 }
                 long numAllBlock = (long)Math.Ceiling((double)fileInfo.Length / (double)Segment.lengthBlockFile);
                 if ((fileInfo.Length == 0) || (numAllBlock >= 256))
                 {
                     socket.Send(buffer);
-                    return $"W:File is very big - File:\"{fileInfo.FullName}\"";
+                    return new PccSystemMessage(PccSystemMessageKey.WARRNING, "File is very big", $"File:\"{fileInfo.FullName}\"");
                 }
 
                 //send first file part aes(system message or number of block + fileInfo)
@@ -90,7 +89,7 @@ namespace ProtocolCryptographyC
                 buffer = Segment.PackSegment(TypeSegment.FILE, 0, cryptAES.Encrypt(bufferFile));
                 if (buffer == null)
                 {
-                    return $"E:File info wasn't sent - File:\"{fileInfo.FullName}\"";
+                    return new PccSystemMessage(PccSystemMessageKey.ERROR, "File info wasn't sent", $"File:\"{fileInfo.FullName}\"");
                 }
                 socket.Send(buffer);
 
@@ -114,38 +113,35 @@ namespace ProtocolCryptographyC
                         buffer = Segment.PackSegment(TypeSegment.FILE, (byte)i, cryptAES.Encrypt(bufferFile));
                         if (buffer == null)
                         {
-                            return $"E:File block {i}/{numAllBlock} wasn't sent - File:\"{fileInfo.FullName}\"";
+                            return new PccSystemMessage(PccSystemMessageKey.ERROR, $"File block {i}/{numAllBlock} wasn't sent", $"File:\"{fileInfo.FullName}\"");
                         }
                         socket.Send(buffer);
                     }
                 }
-                return $"I:All file's block [{numAllBlock}] was sent - File:\"{fileInfo.FullName}\"";
+                return new PccSystemMessage(PccSystemMessageKey.INFO, $"All file's block [{numAllBlock}] was sent", $"File:\"{fileInfo.FullName}\"");
             }
             catch(Exception e)
             {
-                return $"F:{e}";
+                return new PccSystemMessage(PccSystemMessageKey.FATAL_ERROR, e.Message, e.StackTrace);
             }
         }
-        public string GetFile(string path)
+        public PccSystemMessage GetFile(string path)
         {
             try
             {
                 //get first part file aes(system message or number of block + fileInfo)
                 Segment? segment;
                 segment = Segment.ParseSegment(socket);
-                
-                if (segment == null)
+
+                if ((segment == null) || (segment.Type != TypeSegment.FILE) || (segment.Payload == null))
                 {
-                    return "E:File info wasn't got";
+                    return new PccSystemMessage(PccSystemMessageKey.ERROR, "File info wasn't got");
                 }
-                if ((segment.Type != TypeSegment.FILE) || (segment.Payload == null))
-                {
-                    return "E:File info wasn't got";
-                }
+
                 byte[] buffer = cryptAES.Decrypt(segment.Payload);
                 if (Encoding.UTF8.GetString(buffer) == "error")
                 {
-                    return $"W:File not found or very big";
+                    return new PccSystemMessage(PccSystemMessageKey.WARRNING, "File not found or very big");
                 }
 
                 byte numAllBlock = buffer[0];
@@ -175,23 +171,19 @@ namespace ProtocolCryptographyC
                     for (int i = 0; i < numAllBlock; i++)
                     {
                         segment = Segment.ParseSegment(socket);
-                        if (segment == null)
+                        if ((segment == null) || (segment.Type != TypeSegment.FILE) || (segment.Payload == null))
                         {
-                            return $"E:Wasn't get file block {i}/{numAllBlock} - File:\"{fileInfo.Name}\"";
-                        }
-                        if ((segment.Type != TypeSegment.FILE) || (segment.Payload == null))
-                        {
-                            return $"E:Wasn't get file block {i}/{numAllBlock} - File:\"{fileInfo.Name}\"";
+                            return new PccSystemMessage(PccSystemMessageKey.ERROR, $"File block {i}/{numAllBlock} was't got", $"File:\"{fileInfo.Name}\"");
                         }
                         fstream.Seek(i * Segment.lengthBlockFile, SeekOrigin.Begin);
                         fstream.Write(cryptAES.Decrypt(segment.Payload));
                     }
                 }
-                return $"I:All file's block [{numAllBlock}] was get - File:\"{fileInfo.Name}\"";
+                return new PccSystemMessage(PccSystemMessageKey.INFO, $"All file's block [{numAllBlock}] was got", $"File:\"{fileInfo.Name}\"");
             }
             catch(Exception e)
             {
-                return $"F:{e}";
+                return new PccSystemMessage(PccSystemMessageKey.FATAL_ERROR, e.Message, e.StackTrace);
             }
         }
     }

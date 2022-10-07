@@ -19,7 +19,7 @@ namespace ProtocolCryptographyC
             this.cryptAES = cryptAES;
         }
 
-        public string SendMessage(byte[] message)
+        public PccSystemMessage SendMessage(byte[] message)
         {
             if(message == null)
                 throw new ArgumentNullException(nameof(message));
@@ -27,28 +27,30 @@ namespace ProtocolCryptographyC
             {
                 byte[]? bufferFile = Segment.PackSegment(TypeSegment.MESSAGE, 0, cryptAES.Encrypt(message));
                 socket.Send(bufferFile);
-                return "I:Message was sent";
+                return new PccSystemMessage(PccSystemMessageKey.ERROR, "Message was sent");
             }
             catch (Exception e)
             {
-                return $"F:{e}";
+                return new PccSystemMessage(PccSystemMessageKey.FATAL_ERROR, e.Message, e.StackTrace);
             }
         }
 
-        public byte[] GetMessage()
+        public PccSystemMessage GetMessage(out byte[]? message)
         {
+            message = null;
             try
             {
                 Segment? segment = Segment.ParseSegment(socket);
                 if ((segment == null) || (segment.Type != TypeSegment.MESSAGE) || (segment.Payload == null))
                 {
-                    return Encoding.UTF8.GetBytes("E:Message wasn't got");
+                    return new PccSystemMessage(PccSystemMessageKey.ERROR, "Message wasn't got");
                 }
-                return cryptAES.Decrypt(segment.Payload);
+                message = cryptAES.Decrypt(segment.Payload);
+                return new PccSystemMessage(PccSystemMessageKey.INFO, "Message was got");
             }
             catch (Exception e)
             {
-                return Encoding.UTF8.GetBytes($"F:{e}");
+                return new PccSystemMessage(PccSystemMessageKey.FATAL_ERROR, e.Message, e.StackTrace);
             }
         }
     }
