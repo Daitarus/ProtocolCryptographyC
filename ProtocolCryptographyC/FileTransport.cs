@@ -9,11 +9,13 @@ namespace ProtocolCryptographyC
     {
         public Socket socket;
         private CryptAES cryptAES;
+        public int Num { get; }
         
-        public FileTransport(Socket socket, CryptAES cryptAES)
+        public FileTransport(Socket socket, CryptAES cryptAES, int num)
         {
             this.socket = socket;
             this.cryptAES = cryptAES;
+            Num = num;
         }
 
 
@@ -94,7 +96,7 @@ namespace ProtocolCryptographyC
                 socket.Send(buffer);
 
                 //send file
-                using (FileStream fstream = File.Open(fileInfo.FullName, FileMode.Open))
+                using (FileStream fstream = File.Open(fileInfo.FullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                 {
                     //load file part
                     int numReadByte;
@@ -166,7 +168,7 @@ namespace ProtocolCryptographyC
 
                 //get file
                 FileInfo fileInfo = new FileInfo(path + Encoding.UTF8.GetString(bufferFile));
-                using (FileStream fstream = new FileStream(fileInfo.FullName, FileMode.OpenOrCreate))
+                using (FileStream fstream = new FileStream(fileInfo.FullName, FileMode.OpenOrCreate, FileAccess.Write, FileShare.ReadWrite))
                 {
                     for (int i = 0; i < numAllBlock; i++)
                     {

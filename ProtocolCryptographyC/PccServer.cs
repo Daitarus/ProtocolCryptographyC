@@ -1,21 +1,18 @@
-﻿using System.Net;
+﻿using CryptL;
+using System.Net;
 using System.Net.Sockets;
-using System.Security.Cryptography;
-using CryptL;
 
 namespace ProtocolCryptographyC
 {
     public sealed class PccServer
     {
         public delegate bool Authorization(byte[] hash);
-        public delegate void Algorithm(ClientInfo clientInfo);
+        public delegate void MainServerAlgorithm(MessageTransport messageTransport, FileTransport fileTransport, ClientInfo clientInfo);
         public delegate void GetSystemMessage(PccSystemMessage systemMessage);
 
         private CryptRSA cryptRSA;
         private IPEndPoint serverEndPoint;
-        private Socket listenSocket  = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        public FileTransport fileTransport;
-        public MessageTransport messageTransport;
+        private Socket listenSocket;
 
 
         public PccServer(IPEndPoint serverEndPoint, CryptRSA cryptRSA)
@@ -23,17 +20,17 @@ namespace ProtocolCryptographyC
             this.serverEndPoint = serverEndPoint;
             this.cryptRSA = cryptRSA;
         }
-        public PccSystemMessage Start(Authorization authorization, Algorithm algorithm, GetSystemMessage getSystemMessage)
+        public PccSystemMessage Start(Authorization authorization, MainServerAlgorithm algorithm, GetSystemMessage getSystemMessage)
         {
             try
 			{
-				while (true)
+                while (true)
 				{
 					listenSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 					listenSocket.Bind(serverEndPoint);
 					listenSocket.Listen(1);
                     Socket clientSocket = listenSocket.Accept();
-                    Task clientWork = new Task(() => ClientWork(clientSocket, authorization, algorithm, getSystemMessage));
+                    Thread clientWork = new Thread(() => ClientWork(clientSocket, authorization, algorithm, getSystemMessage));
                     clientWork.Start();
 					listenSocket.Close();
 				}
@@ -43,20 +40,19 @@ namespace ProtocolCryptographyC
                 return new PccSystemMessage(PccSystemMessageKey.FATAL_ERROR, e.Message, e.StackTrace);
             }
 		}
-		private void ClientWork(Socket socket, Authorization authorization, Algorithm algorithm, GetSystemMessage getSystemMessage)
+
+        public void ClientWork(Socket socket, Authorization authorization, MainServerAlgorithm mainServerAlgorithm, GetSystemMessage getSystemMessage)
         {
             ClientInfo clientInfo = new ClientInfo((IPEndPoint)socket.RemoteEndPoint, DateTime.Now);
+            CryptAES cryptAES = new CryptAES();
 
             PccSystemMessage systemMessage = new PccSystemMessage(PccSystemMessageKey.INFO, "connected", $"{clientInfo.ClientEndPoint.Address}:{clientInfo.ClientEndPoint.Port}");
             getSystemMessage(systemMessage);
 
-            Segment segment = new Segment();           
-            CryptAES cryptAES = new CryptAES();
-
             try
             {
                 //wait first message
-                segment = Segment.ParseSegment(socket);
+                Segment segment = Segment.ParseSegment(socket);
                 if (segment != null)
                 {
                     if (segment.Type == TypeSegment.ASK_GET_PKEY)
@@ -88,21 +84,18 @@ namespace ProtocolCryptographyC
                                 //authorization
                                 if (authorization(hash))
                                 {
-                                    systemMessage.Message = "authorization";
+                                    systemMessage.Update(PccSystemMessageKey.INFO, "authorization");
                                     getSystemMessage(systemMessage);
 
                                     buffer = Segment.PackSegment(TypeSegment.ANSWER_AUTHORIZATION_YES, 0, null);
                                     socket.Send(buffer);
 
-                                    //algorithm execution
-                                    messageTransport = new MessageTransport(socket, cryptAES);
-                                    fileTransport = new FileTransport(socket, cryptAES);
-                                    algorithm(clientInfo);
+                                    //mainServerAlgorithm execution
+                                    mainServerAlgorithm(new MessageTransport(socket, cryptAES), new FileTransport(socket, cryptAES, clientInfo.ClientEndPoint.Port), clientInfo);
                                 }
                                 else
                                 {
-                                    systemMessage.Key = PccSystemMessageKey.WARRNING;
-                                    systemMessage.Message = "no authorization";
+                                    systemMessage.Update(PccSystemMessageKey.WARRNING, "no authorization");
                                     getSystemMessage(systemMessage);
 
                                     buffer = Segment.PackSegment(TypeSegment.ANSWER_AUTHORIZATION_NO, 0, null);
@@ -112,12 +105,11 @@ namespace ProtocolCryptographyC
                         }
                     }
                 }
+
             }
-            catch(Exception e)
+            catch (Exception e)
             {
-                systemMessage.Key = PccSystemMessageKey.FATAL_ERROR;
-                systemMessage.Message = e.Message;
-                systemMessage.AdditionalMessage = e.StackTrace;
+                systemMessage.Update(PccSystemMessageKey.FATAL_ERROR, e.Message, e.StackTrace);
                 getSystemMessage(systemMessage);
             }
             finally
@@ -125,6 +117,7 @@ namespace ProtocolCryptographyC
                 getSystemMessage(Disconnect(socket, clientInfo));
             }
         }
+
 
         private PccSystemMessage Disconnect(Socket socket, ClientInfo clientInfo)
         {
@@ -138,6 +131,6 @@ namespace ProtocolCryptographyC
                 socket.Close();
             }
             return new PccSystemMessage(PccSystemMessageKey.INFO, "Disconnect");
-        }  
+        }
     }
 }

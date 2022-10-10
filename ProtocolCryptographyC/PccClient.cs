@@ -65,7 +65,7 @@ namespace ProtocolCryptographyC
 
                 //connect
                 messageTransport = new MessageTransport(socket, cryptAES);
-                fileTransport = new FileTransport(socket, cryptAES);
+                fileTransport = new FileTransport(socket, cryptAES, 0);
                 return new PccSystemMessage(PccSystemMessageKey.INFO, "Successful connect");
             }
             catch(Exception e)
