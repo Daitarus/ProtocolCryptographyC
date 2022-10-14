@@ -27,7 +27,7 @@ namespace ProtocolCryptographyC
             {
                 byte[]? bufferFile = Segment.PackSegment(TypeSegment.MESSAGE, 0, cryptAES.Encrypt(message));
                 socket.Send(bufferFile);
-                return new PccSystemMessage(PccSystemMessageKey.ERROR, "Message was sent");
+                return new PccSystemMessage(PccSystemMessageKey.INFO, "Message was sent");
             }
             catch (Exception e)
             {
