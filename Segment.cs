@@ -14,7 +14,6 @@ namespace ProtocolCryptographyC
 		private byte numSegment;
 		private byte[] length;
 		private byte[]? payload;
-		private byte[]? buffer;
 		public static int lengthBlockFile = 16777199;
 		private static int lengthBlockFileCrypto = 16777200;
 
@@ -22,7 +21,6 @@ namespace ProtocolCryptographyC
 		public byte NumSegment { get { return numSegment; } }
 		public byte[] Length { get { return length; } }
 		public byte[]? Payload { get { return payload; } }
-		public byte[]? Buffer { get { return buffer; } }
 
 		public Segment(TypeSegment type, byte numSegment, byte[] length, byte[]? payload)
         {

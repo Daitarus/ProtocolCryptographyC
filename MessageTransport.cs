@@ -48,7 +48,7 @@ namespace ProtocolCryptographyC
                 message = cryptAES.Decrypt(segment.Payload);
                 return new PccSystemMessage(PccSystemMessageKey.INFO, "Message was got");
             }
-            catch (Exception e)
+            catch (CryptographicException e)
             {
                 return new PccSystemMessage(PccSystemMessageKey.FATAL_ERROR, e.Message, e.StackTrace);
             }
